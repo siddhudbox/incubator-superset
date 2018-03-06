@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """The main config file for Superset
 
 All configuration in this file can be overridden by providing a superset_config
@@ -9,11 +10,11 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+from collections import OrderedDict
 import imp
 import json
 import os
 import sys
-from collections import OrderedDict
 
 from dateutil import tz
 from flask_appbuilder.security.manager import AUTH_DB
@@ -28,8 +29,6 @@ if 'SUPERSET_HOME' in os.environ:
     DATA_DIR = os.environ['SUPERSET_HOME']
 else:
     DATA_DIR = os.path.join(os.path.expanduser('~'), '.superset')
-if not os.path.exists(DATA_DIR):
-    os.makedirs(DATA_DIR)
 
 # ---------------------------------------------------------
 # Superset specific config
@@ -41,6 +40,8 @@ with open(PACKAGE_FILE) as package_file:
 
 ROW_LIMIT = 50000
 VIZ_ROW_LIMIT = 10000
+# max rows retrieved by filter select auto complete
+FILTER_SELECT_ROW_LIMIT =10000
 SUPERSET_WORKERS = 2
 SUPERSET_CELERY_WORKERS = 32
 
@@ -60,11 +61,23 @@ SECRET_KEY = '\2\1thisismyscretkey\1\2\e\y\y\h'  # noqa
 SQLALCHEMY_DATABASE_URI = 'mysql://root:root@127.0.0.1:3306/superset' #'mysql://myapp@localhost/myapp'
 # SQLALCHEMY_DATABASE_URI = 'postgresql://root:password@localhost/myapp'
 
+# In order to hook up a custom password store for all SQLACHEMY connections
+# implement a function that takes a single argument of type 'sqla.engine.url',
+# returns a password and set SQLALCHEMY_CUSTOM_PASSWORD_STORE.
+#
+# e.g.:
+# def lookup_password(url):
+#     return 'secret'
+# SQLALCHEMY_CUSTOM_PASSWORD_STORE = lookup_password
+
 # The limit of queries fetched for query search
 QUERY_SEARCH_LIMIT = 1000
 
 # Flask-WTF flag for CSRF
 WTF_CSRF_ENABLED = True
+
+# Add endpoints that need to be exempt from CSRF protection
+WTF_CSRF_EXEMPT_LIST = []
 
 # Whether to run the web server in debug mode or not
 DEBUG = False
@@ -80,10 +93,10 @@ ENABLE_PROXY_FIX = False
 # GLOBALS FOR APP Builder
 # ------------------------------
 # Uncomment to setup Your App name
-APP_NAME = "Darwinbox"
+APP_NAME = 'Darwinbox Analytics'
 
 # Uncomment to setup an App icon
-APP_ICON = "/static/assets/images/superset-logo@2x.png"
+APP_ICON = '/static/assets/images/superset-logo@2x.png'
 
 # Druid query timezone
 # tz.tzutc() : Using utc timezone
@@ -142,13 +155,15 @@ PUBLIC_ROLE_LIKE_GAMMA = False
 # Setup default language
 BABEL_DEFAULT_LOCALE = 'en'
 # Your application default translation path
-BABEL_DEFAULT_FOLDER = 'babel/translations'
+BABEL_DEFAULT_FOLDER = 'superset/translations'
 # The allowed translation for you app
 LANGUAGES = {
     'en': {'flag': 'us', 'name': 'English'},
     'it': {'flag': 'it', 'name': 'Italian'},
-    # 'fr': {'flag': 'fr', 'name': 'French'},
-    # 'zh': {'flag': 'cn', 'name': 'Chinese'},
+    'fr': {'flag': 'fr', 'name': 'French'},
+    'zh': {'flag': 'cn', 'name': 'Chinese'},
+    'ja': {'flag': 'jp', 'name': 'Japanese'},
+    'de': {'flag': 'de', 'name': 'German'},
 }
 # ---------------------------------------------------
 # Image and file configuration
@@ -172,6 +187,15 @@ TABLE_NAMES_CACHE_CONFIG = {'CACHE_TYPE': 'null'}
 ENABLE_CORS = False
 CORS_OPTIONS = {}
 
+# Allowed format types for upload on Database view
+# TODO: Add processing of other spreadsheet formats (xls, xlsx etc)
+ALLOWED_EXTENSIONS = set(['csv'])
+
+# CSV Options: key/value pairs that will be passed as argument to DataFrame.to_csv method
+# note: index option should not be overridden
+CSV_EXPORT = {
+    'encoding': 'utf-8',
+}
 
 # ---------------------------------------------------
 # List of viz_types not allowed in your environment
@@ -220,7 +244,7 @@ INTERVAL = 1
 BACKUP_COUNT = 30
 
 # Set this API key to enable Mapbox visualizations
-MAPBOX_API_KEY = ""
+MAPBOX_API_KEY = ''
 
 # Maximum number of rows returned in the SQL editor
 SQL_MAX_ROW = 1000000
@@ -254,10 +278,12 @@ SQL_CELERY_DB_FILE_PATH = os.path.join(DATA_DIR, 'celerydb.sqlite')
 SQL_CELERY_RESULTS_DB_FILE_PATH = os.path.join(DATA_DIR, 'celery_results.sqlite')
 
 # static http headers to be served by your Superset server.
-# The following example prevents iFrame from other domains
-# and "clickjacking" as a result
-# HTTP_HEADERS = {'X-Frame-Options': 'SAMEORIGIN'}
-HTTP_HEADERS = {}
+# This header prevents iFrames from other domains and
+# "clickjacking" as a result
+HTTP_HEADERS = {'X-Frame-Options': 'SAMEORIGIN'}
+# If you need to allow iframes from other domains (and are
+# aware of the risks), you can disable this header:
+# HTTP_HEADERS = {}
 
 # The db id here results in selecting this one as a default in SQL Lab
 DEFAULT_DB_ID = None
@@ -277,6 +303,14 @@ SQLLAB_ASYNC_TIME_LIMIT_SEC = 60 * 60 * 6
 # in SQL Lab by using the "Run Async" button/feature
 RESULTS_BACKEND = None
 
+# The S3 bucket where you want to store your external hive tables created
+# from CSV files. For example, 'companyname-superset'
+CSV_TO_HIVE_UPLOAD_S3_BUCKET = None
+
+# The directory within the bucket specified above that will
+# contain all the external tables
+CSV_TO_HIVE_UPLOAD_DIRECTORY = 'EXTERNAL_HIVE_TABLES/'
+
 # A dictionary of items that gets merged into the Jinja context for
 # SQL Lab. The existing context gets updated with this dictionary,
 # meaning values for existing keys get overwritten by the content of this
@@ -289,6 +323,15 @@ ROBOT_PERMISSION_ROLES = ['Public', 'Gamma', 'Alpha', 'Admin', 'sql_lab']
 
 CONFIG_PATH_ENV_VAR = 'SUPERSET_CONFIG_PATH'
 
+# If a callable is specified, it will be called at app startup while passing
+# a reference to the Flask app. This can be used to alter the Flask app
+# in whatever way.
+# example: FLASK_APP_MUTATOR = lambda x: x.before_request = f
+FLASK_APP_MUTATOR = None
+
+# Set this to false if you don't want users to be able to request/grant
+# datasource access requests from/to other users.
+ENABLE_ACCESS_REQUEST = False
 
 # smtp server configuration
 EMAIL_NOTIFICATIONS = False  # all the emails are sent using dryrun
@@ -308,6 +351,13 @@ if not CACHE_DEFAULT_TIMEOUT:
 # permission management
 SILENCE_FAB = True
 
+# The link to a page containing common errors and their resolutions
+# It will be appended at the bottom of sql_lab errors.
+TROUBLESHOOTING_LINK = ''
+
+# This link should lead to a page with instructions on how to gain access to a
+# Datasource. It will be placed at the bottom of permissions errors.
+PERMISSION_INSTRUCTIONS_LINK = ''
 
 # Integrate external Blueprints to the app by passing them to your
 # configuration. These blueprints will get integrated in the app
@@ -316,7 +366,16 @@ BLUEPRINTS = []
 # Provide a callable that receives a tracking_url and returns another
 # URL. This is used to translate internal Hadoop job tracker URL
 # into a proxied one
-TRACKING_URL_TRANSFORMER = lambda x: x
+TRACKING_URL_TRANSFORMER = lambda x: x  # noqa: E731
+
+# Interval between consecutive polls when using Hive Engine
+HIVE_POLL_INTERVAL = 5
+
+# Allow for javascript controls components
+# this enables programmers to customize certain charts (like the
+# geospatial ones) by inputing javascript in controls. This exposes
+# an XSS security vulnerability
+ENABLE_JAVASCRIPT_CONTROLS = False
 
 try:
     if CONFIG_PATH_ENV_VAR in os.environ:
@@ -325,7 +384,9 @@ try:
         print('Loaded your LOCAL configuration at [{}]'.format(
             os.environ[CONFIG_PATH_ENV_VAR]))
         module = sys.modules[__name__]
-        override_conf = imp.load_source('superset_config', os.environ[CONFIG_PATH_ENV_VAR])
+        override_conf = imp.load_source(
+            'superset_config',
+            os.environ[CONFIG_PATH_ENV_VAR])
         for key in dir(override_conf):
             if key.isupper():
                 setattr(module, key, getattr(override_conf, key))

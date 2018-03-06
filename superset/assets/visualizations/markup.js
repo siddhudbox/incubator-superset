@@ -1,4 +1,4 @@
-const $ = require('jquery');
+const srcdoc = require('srcdoc-polyfill');
 
 require('./markup.css');
 
@@ -8,6 +8,13 @@ function markupWidget(slice, payload) {
   jqdiv.css({
     overflow: 'auto',
   });
+
+  // markup height is slice height - (marginTop + marginBottom)
+  let iframeHeight = slice.height() - 20;
+  if (slice.props.vizType === 'separator') {
+    // separator height is the entire chart container: slice height + header
+    iframeHeight = slice.height() + slice.headerHeight();
+  }
 
   const iframeId = `if__${slice.containerId}`;
   const html = `
@@ -22,10 +29,13 @@ function markupWidget(slice, payload) {
   jqdiv.html(`
     <iframe id="${iframeId}"
       frameborder="0"
-      height="${slice.height()}"
-      sandbox="allow-scripts">
-    </iframe>`);
-  $('#' + iframeId)[0].srcdoc = html;
+      height="${iframeHeight}"
+      sandbox="allow-same-origin allow-scripts allow-top-navigation allow-popups">
+    </iframe>
+  `);
+
+  const iframe = document.getElementById(iframeId);
+  srcdoc.set(iframe, html);
 }
 
 module.exports = markupWidget;

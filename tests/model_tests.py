@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import unittest
 
 from sqlalchemy.engine.url import make_url
@@ -54,3 +60,16 @@ class DatabaseModelTestCase(unittest.TestCase):
 
         db = make_url(model.get_sqla_engine(schema='staging').url).database
         self.assertEquals('staging', db)
+
+    def test_database_impersonate_user(self):
+        uri = 'mysql://root@localhost'
+        example_user = 'giuseppe'
+        model = Database(sqlalchemy_uri=uri)
+
+        model.impersonate_user = True
+        user_name = make_url(model.get_sqla_engine(user_name=example_user).url).username
+        self.assertEquals(example_user, user_name)
+
+        model.impersonate_user = False
+        user_name = make_url(model.get_sqla_engine(user_name=example_user).url).username
+        self.assertNotEquals(example_user, user_name)

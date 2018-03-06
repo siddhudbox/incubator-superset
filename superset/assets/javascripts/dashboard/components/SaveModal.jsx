@@ -4,6 +4,7 @@ import PropTypes from 'prop-types';
 import { Button, FormControl, FormGroup, Radio } from 'react-bootstrap';
 import { getAjaxErrorMsg } from '../../modules/utils';
 import ModalTrigger from '../../components/ModalTrigger';
+import { t } from '../../locales';
 import Checkbox from '../../components/Checkbox';
 
 const $ = window.$ = require('jquery');
@@ -12,6 +13,9 @@ const propTypes = {
   css: PropTypes.string,
   dashboard: PropTypes.object.isRequired,
   triggerNode: PropTypes.node.isRequired,
+  filters: PropTypes.object.isRequired,
+  serialize: PropTypes.func,
+  onSave: PropTypes.func,
 };
 
 class SaveModal extends React.PureComponent {
@@ -44,8 +48,8 @@ class SaveModal extends React.PureComponent {
     });
   }
   saveDashboardRequest(data, url, saveType) {
-    const dashboard = this.props.dashboard;
     const saveModal = this.modal;
+    const onSaveDashboard = this.props.onSave;
     Object.assign(data, { css: this.props.css });
     $.ajax({
       type: 'POST',
@@ -55,37 +59,29 @@ class SaveModal extends React.PureComponent {
       },
       success(resp) {
         saveModal.close();
-        dashboard.onSave();
+        onSaveDashboard();
         if (saveType === 'newDashboard') {
           window.location = `/superset/dashboard/${resp.id}/`;
         } else {
-          notify.success('This dashboard was saved successfully.');
+          notify.success(t('This dashboard was saved successfully.'));
         }
       },
       error(error) {
         saveModal.close();
         const errorMsg = getAjaxErrorMsg(error);
-        notify.error('Sorry, there was an error saving this dashboard: </ br>' + errorMsg);
+        notify.error(t('Sorry, there was an error saving this dashboard: ') + '</ br>' + errorMsg);
       },
     });
   }
   saveDashboard(saveType, newDashboardTitle) {
     const dashboard = this.props.dashboard;
-    const expandedSlices = {};
-    $.each($('.slice_info'), function () {
-      const widget = $(this).parents('.widget');
-      const sliceDescription = widget.find('.slice_description');
-      if (sliceDescription.is(':visible')) {
-        expandedSlices[$(widget).attr('data-slice-id')] = true;
-      }
-    });
-    const positions = dashboard.reactGridLayout.serialize();
+    const positions = this.props.serialize();
     const data = {
       positions,
       css: this.state.css,
-      expanded_slices: expandedSlices,
+      expanded_slices: dashboard.metadata.expanded_slices || {},
       dashboard_title: dashboard.dashboard_title,
-      default_filters: dashboard.readFilters(),
+      default_filters: JSON.stringify(this.props.filters),
       duplicate_slices: this.state.duplicateSlices,
     };
     let url = null;
@@ -96,8 +92,8 @@ class SaveModal extends React.PureComponent {
       if (!newDashboardTitle) {
         this.modal.close();
         showModal({
-          title: 'Error',
-          body: 'You must pick a name for the new dashboard',
+          title: t('Error'),
+          body: t('You must pick a name for the new dashboard'),
         });
       } else {
         data.dashboard_title = newDashboardTitle;
@@ -110,8 +106,9 @@ class SaveModal extends React.PureComponent {
     return (
       <ModalTrigger
         ref={(modal) => { this.modal = modal; }}
+        isMenuItem
         triggerNode={this.props.triggerNode}
-        modalTitle="Save Dashboard"
+        modalTitle={t('Save Dashboard')}
         modalBody={
           <FormGroup>
             <Radio
@@ -119,7 +116,7 @@ class SaveModal extends React.PureComponent {
               onChange={this.handleSaveTypeChange}
               checked={this.state.saveType === 'overwrite'}
             >
-              Overwrite Dashboard [{this.props.dashboard.dashboard_title}]
+              {t('Overwrite Dashboard [%s]', this.props.dashboard.dashboard_title)}
             </Radio>
             <hr />
             <Radio
@@ -127,11 +124,11 @@ class SaveModal extends React.PureComponent {
               onChange={this.handleSaveTypeChange}
               checked={this.state.saveType === 'newDashboard'}
             >
-              Save as:
+              {t('Save as:')}
             </Radio>
             <FormControl
               type="text"
-              placeholder="[dashboard name]"
+              placeholder={t('[dashboard name]')}
               value={this.state.newDashName}
               onFocus={this.handleNameChange}
               onChange={this.handleNameChange}
@@ -151,7 +148,7 @@ class SaveModal extends React.PureComponent {
               bsStyle="primary"
               onClick={() => { this.saveDashboard(this.state.saveType, this.state.newDashName); }}
             >
-              Save
+              {t('Save')}
             </Button>
           </div>
         }

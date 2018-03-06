@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Defines the templating context for SQL Lab"""
 from __future__ import absolute_import
 from __future__ import division
@@ -10,10 +11,9 @@ import random
 import time
 import uuid
 
-from jinja2.sandbox import SandboxedEnvironment
-from flask import request, g
-
 from dateutil.relativedelta import relativedelta
+from flask import g, request
+from jinja2.sandbox import SandboxedEnvironment
 
 from superset import app
 
@@ -43,7 +43,7 @@ def url_param(param, default=None):
 
 def current_user_id():
     """The id of the user who is currently logged in"""
-    if g.user:
+    if hasattr(g, 'user') and g.user:
         return g.user.id
 
 

@@ -58,12 +58,24 @@ export default class DateFilterControl extends React.Component {
     }
   }
   onControlChange(target, opt) {
-    this.setState({ [target]: opt.value }, this.onChange);
+    this.setState({ [target]: opt.value });
   }
   onNumberChange(event) {
-    this.setState({ num: event.target.value }, this.onChange);
+    this.setState({ num: event.target.value });
   }
-  onChange() {
+  onFreeChange(event) {
+    this.setState({ free: event.target.value });
+  }
+  setType(type) {
+    this.setState({ type });
+  }
+  setValueAndClose(val) {
+    this.setState({ type: 'free', free: val }, this.close);
+  }
+  setDatetime(dttm) {
+    this.setState({ dttm: dttm.format().substring(0, 19) });
+  }
+  close() {
     let val;
     if (this.state.type === 'rel') {
       val = `${this.state.num} ${this.state.grain} ${this.state.rel}`;
@@ -73,27 +85,12 @@ export default class DateFilterControl extends React.Component {
       val = this.state.free;
     }
     this.props.onChange(val);
-  }
-  onFreeChange(event) {
-    this.setState({ free: event.target.value }, this.onChange);
-  }
-  setType(type) {
-    this.setState({ type }, this.onChange);
-  }
-  setValue(val) {
-    this.setState({ type: 'free', free: val }, this.onChange);
-    this.close();
-  }
-  setDatetime(dttm) {
-    this.setState({ dttm: dttm.format().substring(0, 19) }, this.onChange);
-  }
-  close() {
     this.refs.trigger.hide();
   }
   renderPopover() {
     return (
       <Popover id="filter-popover">
-        <div style={{ width: '240px' }}>
+        <div style={{ width: '250px' }}>
           <PopoverSection
             title="Fixed"
             isSelected={this.state.type === 'fix'}
@@ -177,13 +174,15 @@ export default class DateFilterControl extends React.Component {
             >
               <Button
                 bsSize="small"
-                onClick={this.setValue.bind(this, 'now')}
+                className="now"
+                onClick={this.setValueAndClose.bind(this, 'now')}
               >
                 now
               </Button>
               <Button
                 bsSize="small"
-                onClick={this.setValue.bind(this, '')}
+                className="clear"
+                onClick={this.setValueAndClose.bind(this, '')}
               >
                 clear
               </Button>

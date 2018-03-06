@@ -16,8 +16,10 @@ function tableVis(slice, payload) {
   const data = payload.data;
   const fd = slice.formData;
 
-  // Removing metrics (aggregates) that are strings
   let metrics = fd.metrics || [];
+  // Add percent metrics
+  metrics = metrics.concat((fd.percent_metrics || []).map(m => '%' + m));
+  // Removing metrics (aggregates) that are strings
   metrics = metrics.filter(m => !isNaN(data.records[0][m]));
 
   function col(c) {
@@ -38,11 +40,22 @@ function tableVis(slice, payload) {
   div.html('');
   const table = div.append('table')
     .classed(
-      'dataframe dataframe table table-striped table-bordered ' +
+      'dataframe dataframe table table-striped ' +
       'table-condensed table-hover dataTable no-footer', true)
     .attr('width', '100%');
 
-  const cols = data.columns.map(c => slice.datasource.verbose_map[c] || c);
+  const verboseMap = slice.datasource.verbose_map;
+  const cols = data.columns.map((c) => {
+    if (verboseMap[c]) {
+      return verboseMap[c];
+    }
+    // Handle verbose names for percents
+    if (c[0] === '%') {
+      const cName = c.substring(1);
+      return '% ' + (verboseMap[cName] || cName);
+    }
+    return c;
+  });
 
   table.append('thead').append('tr')
     .selectAll('th')
@@ -53,6 +66,7 @@ function tableVis(slice, payload) {
       return d;
     });
 
+  const filters = slice.getFilters();
   table.append('tbody')
     .selectAll('tr')
     .data(data.records)
@@ -71,6 +85,9 @@ function tableVis(slice, payload) {
       }
       if (isMetric) {
         html = slice.d3format(c, val);
+      }
+      if (c[0] === '%') {
+        html = d3.format('.3p')(val);
       }
       return {
         col: c,
@@ -103,6 +120,12 @@ function tableVis(slice, payload) {
     .attr('data-sort', function (d) {
       return (d.isMetric) ? d.val : null;
     })
+    // Check if the dashboard currently has a filter for each row
+    .classed('filtered', d =>
+      filters &&
+      filters[d.col] &&
+      filters[d.col].indexOf(d.val) >= 0,
+    )
     .on('click', function (d) {
       if (!d.isMetric && fd.table_filter) {
         const td = d3.select(this);
@@ -139,10 +162,22 @@ function tableVis(slice, payload) {
   fixDataTableBodyHeight(
       container.find('.dataTables_wrapper'), height);
   // Sorting table by main column
-  if (metrics.length > 0) {
-    const mainMetric = metrics[0];
-    datatable.column(data.columns.indexOf(mainMetric)).order('desc').draw();
+  let sortBy;
+  if (fd.timeseries_limit_metric) {
+    // Sort by as specified
+    sortBy = fd.timeseries_limit_metric;
+  } else if (metrics.length > 0) {
+    // If not specified, use the first metric from the list
+    sortBy = metrics[0];
   }
+  if (sortBy) {
+    datatable.column(data.columns.indexOf(sortBy)).order(fd.order_desc ? 'desc' : 'asc');
+  }
+  if (fd.timeseries_limit_metric && metrics.indexOf(fd.timeseries_limit_metric) < 0) {
+    // Hiding the sortBy column if not in the metrics list
+    datatable.column(data.columns.indexOf(sortBy)).visible(false);
+  }
+  datatable.draw();
   container.parents('.widget').find('.tooltip').remove();
 }
 

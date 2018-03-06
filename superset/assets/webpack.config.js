@@ -19,9 +19,9 @@ const config = {
     common: APP_DIR + '/javascripts/common.js',
     addSlice: ['babel-polyfill', APP_DIR + '/javascripts/addSlice/index.jsx'],
     explore: ['babel-polyfill', APP_DIR + '/javascripts/explore/index.jsx'],
-    dashboard: ['babel-polyfill', APP_DIR + '/javascripts/dashboard/Dashboard.jsx'],
+    dashboard: ['babel-polyfill', APP_DIR + '/javascripts/dashboard/index.jsx'],
     sqllab: ['babel-polyfill', APP_DIR + '/javascripts/SqlLab/index.jsx'],
-    welcome: ['babel-polyfill', APP_DIR + '/javascripts/welcome.js'],
+    welcome: ['babel-polyfill', APP_DIR + '/javascripts/welcome/index.jsx'],
     profile: ['babel-polyfill', APP_DIR + '/javascripts/profile/index.jsx'],
   },
   output: {
@@ -36,12 +36,10 @@ const config = {
     ],
     alias: {
       webworkify: 'webworkify-webpack',
-      'mapbox-gl$': path.join(__dirname, '/node_modules/mapbox-gl/dist/mapbox-gl.js'),
     },
 
   },
   module: {
-    noParse: /mapbox-gl\/dist/,
     loaders: [
       {
         test: /datatables\.net.*/,
@@ -49,21 +47,15 @@ const config = {
       },
       {
         test: /\.jsx?$/,
-        exclude: APP_DIR + '/node_modules',
+        exclude: /node_modules/,
         loader: 'babel-loader',
         query: {
           presets: [
             'airbnb',
-            'es2015',
+            'env',
             'react',
           ],
         },
-      },
-      /* for mapbox-gl/js/geo/transform */
-      {
-        test: /\.js$/,
-        include: APP_DIR + '/node_modules/mapbox-gl/js',
-        loader: 'babel-loader',
       },
       // Extract css files
       {
@@ -105,16 +97,6 @@ const config = {
       {
         test: /\.(ttf|eot|svg)(\?v=[0-9]\.[0-9]\.[0-9])?$/,
         loader: 'file-loader',
-      },
-      /* for mapbox */
-      {
-        test: /\.json$/,
-        loader: 'json-loader',
-      },
-      {
-        test: /\.js$/,
-        include: APP_DIR + '/node_modules/mapbox-gl/js/render/painter/use_program.js',
-        loader: 'transform/cacheable?brfs',
       },
     ],
   },

@@ -4,12 +4,15 @@ import PropTypes from 'prop-types';
 import { BootstrapTable, TableHeaderColumn } from 'react-bootstrap-table';
 
 import ModalTrigger from '../../components/ModalTrigger';
+import { t } from '../../locales';
 
 require('react-bootstrap-table/css/react-bootstrap-table.css');
 
 const propTypes = {
   dashboard: PropTypes.object.isRequired,
   triggerNode: PropTypes.node.isRequired,
+  userId: PropTypes.string.isRequired,
+  addSlicesToDashboard: PropTypes.func,
 };
 
 class SliceAdder extends React.Component {
@@ -38,11 +41,13 @@ class SliceAdder extends React.Component {
   }
 
   componentWillUnmount() {
-    this.slicesRequest.abort();
+    if (this.slicesRequest) {
+      this.slicesRequest.abort();
+    }
   }
 
   onEnterModal() {
-    const uri = '/sliceaddview/api/read?_flt_0_created_by=' + this.props.dashboard.curUserId;
+    const uri = `/sliceaddview/api/read?_flt_0_created_by=${this.props.userId}`;
     this.slicesRequest = $.ajax({
       url: uri,
       type: 'GET',
@@ -52,6 +57,7 @@ class SliceAdder extends React.Component {
           id: slice.id,
           sliceName: slice.slice_name,
           vizType: slice.viz_type,
+          datasourceLink: slice.datasource_link,
           modified: slice.modified,
         }));
 
@@ -64,14 +70,30 @@ class SliceAdder extends React.Component {
       error: (error) => {
         this.errored = true;
         this.setState({
-          errorMsg: this.props.dashboard.getAjaxErrorMsg(error),
+          errorMsg: t('Sorry, there was an error fetching slices to this dashboard: ') +
+          this.getAjaxErrorMsg(error),
         });
       },
     });
   }
 
+  getAjaxErrorMsg(error) {
+    const respJSON = error.responseJSON;
+    return (respJSON && respJSON.message) ? respJSON.message :
+      error.responseText;
+  }
+
   addSlices() {
-    this.props.dashboard.addSlicesToDashboard(Object.keys(this.state.selectionMap));
+    const adder = this;
+    this.props.addSlicesToDashboard(Object.keys(this.state.selectionMap))
+      // if successful, page will be reloaded.
+      .fail((error) => {
+        adder.errored = true;
+        adder.setState({
+          errorMsg: t('Sorry, there was an error adding slices to this dashboard: ') +
+          this.getAjaxErrorMsg(error),
+        });
+      });
   }
 
   toggleSlice(slice) {
@@ -138,13 +160,21 @@ class SliceAdder extends React.Component {
               dataField="sliceName"
               dataSort
             >
-              Name
+              {t('Name')}
             </TableHeaderColumn>
             <TableHeaderColumn
               dataField="vizType"
               dataSort
             >
-              Viz
+              {t('Viz')}
+            </TableHeaderColumn>
+            <TableHeaderColumn
+              dataField="datasourceLink"
+              dataSort
+              // Will cause react-bootstrap-table to interpret the HTML returned
+              dataFormat={datasourceLink => datasourceLink}
+            >
+              {t('Datasource')}
             </TableHeaderColumn>
             <TableHeaderColumn
               dataField="modified"
@@ -153,7 +183,7 @@ class SliceAdder extends React.Component {
               // Will cause react-bootstrap-table to interpret the HTML returned
               dataFormat={modified => modified}
             >
-              Modified
+              {t('Modified')}
             </TableHeaderColumn>
           </BootstrapTable>
           <button
@@ -163,7 +193,7 @@ class SliceAdder extends React.Component {
             onClick={this.addSlices}
             disabled={!enableAddSlice}
           >
-            Add Slices
+            {t('Add Slices')}
           </button>
         </div>
       </div>
@@ -172,12 +202,13 @@ class SliceAdder extends React.Component {
     return (
       <ModalTrigger
         triggerNode={this.props.triggerNode}
-        tooltip="Add a new slice to the dashboard"
+        tooltip={t('Add a new slice to the dashboard')}
         beforeOpen={this.onEnterModal.bind(this)}
-        isButton
+        isMenuItem
         modalBody={modalContent}
         bsSize="large"
-        modalTitle="Add Slices to Dashboard"
+        setModalAsTriggerChildren
+        modalTitle={t('Add Slices to Dashboard')}
       />
     );
   }

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """A set of constants and methods to manage permissions and security"""
 from __future__ import absolute_import
 from __future__ import division
@@ -5,12 +6,13 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import logging
+
 from flask_appbuilder.security.sqla import models as ab_models
+from sqlalchemy import or_
 
 from superset import conf, db, sm
-from superset.models import core as models
 from superset.connectors.connector_registry import ConnectorRegistry
-
+from superset.models import core as models
 
 READ_ONLY_MODEL_VIEWS = {
     'DatabaseAsync',
@@ -37,6 +39,14 @@ ADMIN_ONLY_VIEW_MENUS = {
     'RoleModelView',
     'Security',
     'UserDBModelView',
+    'UserLDAPModelView',
+    'UserOAuthModelView',
+    'UserOIDModelView',
+    'UserRemoteUserModelView',
+}
+
+ALPHA_ONLY_VIEW_MENUS = {
+    'Upload a CSV',
 }
 
 ADMIN_ONLY_PERMISSIONS = {
@@ -86,15 +96,15 @@ def is_user_defined_permission(perm):
 
 
 def get_or_create_main_db():
-    logging.info("Creating database reference")
+    logging.info('Creating database reference')
     dbobj = (
         db.session.query(models.Database)
         .filter_by(database_name='main')
         .first()
     )
     if not dbobj:
-        dbobj = models.Database(database_name="main")
-    dbobj.set_sqlalchemy_uri(conf.get("SQLALCHEMY_DATABASE_URI"))
+        dbobj = models.Database(database_name='main')
+    dbobj.set_sqlalchemy_uri(conf.get('SQLALCHEMY_DATABASE_URI'))
     dbobj.expose_in_sqllab = True
     dbobj.allow_run_sync = True
     db.session.add(dbobj)
@@ -107,15 +117,20 @@ def is_admin_only(pvm):
     if (pvm.view_menu.name in READ_ONLY_MODEL_VIEWS and
             pvm.permission.name not in READ_ONLY_PERMISSION):
         return True
-    return (pvm.view_menu.name in ADMIN_ONLY_VIEW_MENUS or
-            pvm.permission.name in ADMIN_ONLY_PERMISSIONS)
+    return (
+        pvm.view_menu.name in ADMIN_ONLY_VIEW_MENUS or
+        pvm.permission.name in ADMIN_ONLY_PERMISSIONS
+    )
 
 
 def is_alpha_only(pvm):
     if (pvm.view_menu.name in GAMMA_READ_ONLY_MODEL_VIEWS and
             pvm.permission.name not in READ_ONLY_PERMISSION):
         return True
-    return pvm.permission.name in ALPHA_ONLY_PERMISSIONS
+    return (
+        pvm.view_menu.name in ALPHA_ONLY_VIEW_MENUS or
+        pvm.permission.name in ALPHA_ONLY_PERMISSIONS
+    )
 
 
 def is_admin_pvm(pvm):
@@ -133,16 +148,18 @@ def is_gamma_pvm(pvm):
 
 def is_sql_lab_pvm(pvm):
     return pvm.view_menu.name in {'SQL Lab'} or pvm.permission.name in {
-        'can_sql_json', 'can_csv', 'can_search_queries'}
+        'can_sql_json', 'can_csv', 'can_search_queries',
+    }
 
 
 def is_granter_pvm(pvm):
-    return pvm.permission.name in {'can_override_role_permissions',
-                                   'can_approve'}
+    return pvm.permission.name in {
+        'can_override_role_permissions', 'can_approve',
+    }
 
 
 def set_role(role_name, pvm_check):
-    logging.info("Syncing {} perms".format(role_name))
+    logging.info('Syncing {} perms'.format(role_name))
     sesh = sm.get_session()
     pvms = sesh.query(ab_models.PermissionView).all()
     pvms = [p for p in pvms if p.permission and p.view_menu]
@@ -163,7 +180,7 @@ def create_missing_perms():
     """Creates missing perms for datasources, schemas and metrics"""
 
     logging.info(
-        "Fetching a set of all perms to lookup which ones are missing")
+        'Fetching a set of all perms to lookup which ones are missing')
     all_pvs = set()
     for pv in sm.get_session.query(sm.permissionview_model).all():
         if pv.permission and pv.view_menu:
@@ -174,30 +191,47 @@ def create_missing_perms():
         if view_menu and perm and (view_menu, perm) not in all_pvs:
             merge_perm(sm, view_menu, perm)
 
-    logging.info("Creating missing datasource permissions.")
+    logging.info('Creating missing datasource permissions.')
     datasources = ConnectorRegistry.get_all_datasources(db.session)
     for datasource in datasources:
         merge_pv('datasource_access', datasource.get_perm())
         merge_pv('schema_access', datasource.schema_perm)
 
-    logging.info("Creating missing database permissions.")
+    logging.info('Creating missing database permissions.')
     databases = db.session.query(models.Database).all()
     for database in databases:
         merge_pv('database_access', database.perm)
 
-    logging.info("Creating missing metrics permissions")
+    logging.info('Creating missing metrics permissions')
     metrics = []
     for datasource_class in ConnectorRegistry.sources.values():
         metrics += list(db.session.query(datasource_class.metric_class).all())
 
     for metric in metrics:
-        if (metric.is_restricted):
+        if metric.is_restricted:
             merge_pv('metric_access', metric.perm)
+
+
+def clean_perms():
+    """FAB leaves faulty permissions that need to be cleaned up"""
+    logging.info('Cleaning faulty perms')
+    sesh = sm.get_session()
+    pvms = (
+        sesh.query(ab_models.PermissionView)
+        .filter(or_(
+            ab_models.PermissionView.permission == None,  # NOQA
+            ab_models.PermissionView.view_menu == None,  # NOQA
+        ))
+    )
+    deleted_count = pvms.delete()
+    sesh.commit()
+    if deleted_count:
+        logging.info('Deleted {} faulty permissions'.format(deleted_count))
 
 
 def sync_role_definitions():
     """Inits the Superset application with security roles and such"""
-    logging.info("Syncing role definition")
+    logging.info('Syncing role definition')
 
     get_or_create_main_db()
     create_custom_permissions()
@@ -216,3 +250,4 @@ def sync_role_definitions():
 
     # commit role and view menu updates
     sm.get_session.commit()
+    clean_perms()

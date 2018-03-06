@@ -2,9 +2,10 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { ControlLabel, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import InfoTooltipWithTrigger from '../../components/InfoTooltipWithTrigger';
+import { t } from '../../locales';
 
 const propTypes = {
-  label: PropTypes.string.isRequired,
+  label: PropTypes.string,
   description: PropTypes.string,
   validationErrors: PropTypes.array,
   renderTrigger: PropTypes.bool,
@@ -12,6 +13,8 @@ const propTypes = {
   leftNode: PropTypes.node,
   onClick: PropTypes.func,
   hovered: PropTypes.bool,
+  tooltipOnClick: PropTypes.func,
+  warning: PropTypes.string,
 };
 
 const defaultProps = {
@@ -28,9 +31,10 @@ export default class ControlHeader extends React.Component {
           {this.props.description &&
             <span>
               <InfoTooltipWithTrigger
-                label="descr"
+                label={t('description')}
                 tooltip={this.props.description}
                 placement="top"
+                onClick={this.props.tooltipOnClick}
               />
               {' '}
             </span>
@@ -38,8 +42,8 @@ export default class ControlHeader extends React.Component {
           {this.props.renderTrigger &&
             <span>
               <InfoTooltipWithTrigger
-                label="bolt"
-                tooltip={this.props.description}
+                label={t('bolt')}
+                tooltip={t('Changing this control takes effect instantly')}
                 placement="top"
                 icon="bolt"
               />
@@ -51,6 +55,9 @@ export default class ControlHeader extends React.Component {
     return null;
   }
   render() {
+    if (!this.props.label) {
+      return null;
+    }
     const labelClass = (this.props.validationErrors.length > 0) ? 'text-danger' : '';
     return (
       <div
@@ -69,6 +76,19 @@ export default class ControlHeader extends React.Component {
               {this.props.label}
             </span>
             {' '}
+            {(this.props.warning) &&
+              <span>
+                <OverlayTrigger
+                  placement="top"
+                  overlay={
+                    <Tooltip id={'error-tooltip'}>{this.props.warning}</Tooltip>
+                  }
+                >
+                  <i className="fa fa-exclamation-circle text-danger" />
+                </OverlayTrigger>
+                {' '}
+              </span>
+            }
             {(this.props.validationErrors.length > 0) &&
               <span>
                 <OverlayTrigger
