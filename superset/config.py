@@ -58,7 +58,7 @@ SECRET_KEY = '\2\1thisismyscretkey\1\2\e\y\y\h'  # noqa
 
 # The SQLAlchemy connection string.
 # SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(DATA_DIR, 'superset.db')
-SQLALCHEMY_DATABASE_URI = 'mysql://root:root@127.0.0.1:3306/superset' #'mysql://myapp@localhost/myapp'
+SQLALCHEMY_DATABASE_URI = 'mysql://root:root@mysql:3306/superset' #'mysql://myapp@localhost/myapp'
 # SQLALCHEMY_DATABASE_URI = 'postgresql://root:password@localhost/myapp'
 
 # In order to hook up a custom password store for all SQLACHEMY connections
@@ -96,7 +96,7 @@ ENABLE_PROXY_FIX = False
 APP_NAME = 'Darwinbox Analytics'
 
 # Uncomment to setup an App icon
-APP_ICON = '/static/assets/images/superset-logo@2x.png'
+APP_ICON = 'http://s3-ap-south-1.amazonaws.com/startupuploads/wp-content/uploads/2016/12/01201401/Capture3.png'
 
 # Druid query timezone
 # tz.tzutc() : Using utc timezone
